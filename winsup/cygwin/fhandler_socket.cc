@@ -19,6 +19,7 @@
 
 #include <stdlib.h>
 #define USE_SYS_TYPES_FD_SET
+#include <vmci_sockets.h>
 #include <winsock2.h>
 #include <mswsock.h>
 #include <iphlpapi.h>
@@ -62,6 +63,8 @@ adjust_socket_file_mode (mode_t mode)
   return mode | ((mode & (S_IWUSR | S_IWGRP | S_IWOTH)) << 1);
 }
 
+int vmci_address_family = AF_UNSPEC;
+
 /* cygwin internal: map sockaddr into internet domain address */
 static int
 get_inet_addr (const struct sockaddr *in, int inlen,
@@ -71,7 +74,14 @@ get_inet_addr (const struct sockaddr *in, int inlen,
   int secret_buf [4];
   int* secret_ptr = (secret ? : secret_buf);
 
-  if (in->sa_family == AF_INET || in->sa_family == AF_INET6)
+  if (vmci_address_family == AF_UNSPEC)
+      if ((vmci_address_family = VMCISock_GetAFValue()) < 0)
+        {
+    	  set_errno (EAFNOSUPPORT);
+    	  return 0;
+        }
+
+  if (in->sa_family == AF_INET || in->sa_family == AF_INET6 || in->sa_family == vmci_address_family)
     {
       memcpy (out, in, inlen);
       *outlen = inlen;
